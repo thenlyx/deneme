@@ -1,5 +1,3 @@
-import org.gradle.api.tasks.compile.JavaCompile
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -25,10 +23,4 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    options.release.set(17)
-    sourceCompatibility = "17"
-    targetCompatibility = "17"
 }
