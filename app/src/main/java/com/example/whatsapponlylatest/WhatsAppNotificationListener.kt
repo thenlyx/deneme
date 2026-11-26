@@ -19,11 +19,11 @@ class WhatsAppNotificationListener : NotificationListenerService() {
 
         val newestChild = active
             .filter { !isGroupSummary(it) }
-            .maxByOrNull { it.postTime }
+            .maxByOrNull { messageTime(it) }
 
         if (newestChild != null) {
             prefs.edit()
-                .putLong(KEY_LAST_POST_TIME, newestChild.postTime)
+                .putLong(KEY_LAST_POST_TIME, maxOf(messageTime(newestChild), prefs.getLong(KEY_LAST_POST_TIME, 0L)))
                 .putString(KEY_LAST_KEY, newestChild.key)
                 .apply()
             removeOtherWhatsAppNotifications(newestChild.key)
@@ -44,17 +44,18 @@ class WhatsAppNotificationListener : NotificationListenerService() {
 
         val lastTime = prefs.getLong(KEY_LAST_POST_TIME, 0L)
         val lastKey = prefs.getString(KEY_LAST_KEY, null)
+        val time = messageTime(sbn)
 
-        // WhatsApp eski bir sohbet bildirimini yeniden yayınlarsa,
-        // daha yeni bildirim yerine onu bırakma.
-        if (sbn.postTime < lastTime ||
-            (sbn.postTime == lastTime && lastKey != null && sbn.key != lastKey)) {
+        // Mesajın kendi zamanına (Notification.when) bakılır: WhatsApp eski sohbetleri
+        // yeniden yayınlasa bile mesaj zamanları eski kalır. Daha eski mesajı hemen kaldır.
+        if (time < lastTime ||
+            (time == lastTime && lastKey != null && sbn.key != lastKey)) {
             safelyCancel(sbn.key)
             return
         }
 
         prefs.edit()
-            .putLong(KEY_LAST_POST_TIME, sbn.postTime)
+            .putLong(KEY_LAST_POST_TIME, time)
             .putString(KEY_LAST_KEY, sbn.key)
             .apply()
 
@@ -67,6 +68,12 @@ class WhatsAppNotificationListener : NotificationListenerService() {
                 it.packageName == WHATSAPP_PACKAGE && it.key != keepKey
             }
             ?.forEach { safelyCancel(it.key) }
+    }
+
+    // Mesajın gerçek zamanı; yoksa bildirimin yayın zamanı.
+    private fun messageTime(sbn: StatusBarNotification): Long {
+        val w = sbn.notification.`when`
+        return if (w > 0L) w else sbn.postTime
     }
 
     private fun isGroupSummary(sbn: StatusBarNotification): Boolean {
@@ -85,7 +92,7 @@ class WhatsAppNotificationListener : NotificationListenerService() {
 
     companion object {
         private const val WHATSAPP_PACKAGE = "com.whatsapp"
-        private const val KEY_LAST_POST_TIME = "last_post_time"
-        private const val KEY_LAST_KEY = "last_notification_key"
+        private const val KEY_LAST_POST_TIME = "last_message_time"
+        private const val KEY_LAST_KEY = "last_message_key"
     }
 }
